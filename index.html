@@ -174,6 +174,45 @@ header p{font-size:.78rem;color:var(--text-dim);letter-spacing:.12em;margin-top:
   :root{--sq:clamp(38px,10.5vw,56px);}
 }
 *{scrollbar-width:thin;scrollbar-color:var(--gold-dark) transparent;}
+
+.analysis-badge{
+  position:absolute;top:1px;right:1px;z-index:10;
+  width:18px;height:18px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:10px;font-weight:900;line-height:1;
+  pointer-events:none;
+  box-shadow:0 1px 4px rgba(0,0,0,.7);
+  font-family:'Cinzel',serif;
+}
+.badge-blunder{background:#e05050;color:#fff;}
+.badge-mistake{background:#cc0000;color:#fff;font-size:8px;}
+.badge-good{background:#4a90d9;color:#fff;}
+.badge-best{background:#f0c040;color:#222;}
+.badge-brilliant{background:#00bfa5;color:#fff;font-size:8px;}
+
+#analysis-btn{
+  display:none;
+  background:linear-gradient(135deg,rgba(0,191,165,.22),rgba(0,191,165,.08));
+  border-color:#00bfa5;color:#00bfa5;
+}
+#analysis-btn:hover{background:linear-gradient(135deg,rgba(0,191,165,.38),rgba(0,191,165,.18));}
+#analysis-btn.active{background:linear-gradient(135deg,rgba(0,191,165,.4),rgba(0,191,165,.2));border-color:#00e5cc;color:#00e5cc;}
+
+.analysis-loading{
+  display:none;font-size:.65rem;color:var(--gold);
+  margin-top:4px;text-align:center;animation:blink 1s infinite;
+}
+.analysis-loading.show{display:block;}
+
+.analysis-legend{
+  display:none;margin-top:6px;
+  background:rgba(0,0,0,.3);border-radius:6px;padding:7px 9px;
+  border:1px solid rgba(0,191,165,.2);
+}
+.analysis-legend.show{display:block;}
+.analysis-legend-row{display:flex;align-items:center;gap:5px;font-size:.6rem;color:var(--text-dim);margin-bottom:3px;}
+.analysis-legend-row:last-child{margin-bottom:0;}
+.al-badge{width:15px;height:15px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:900;flex-shrink:0;}
 </style>
 </head>
 <body>
@@ -213,19 +252,12 @@ header p{font-size:.78rem;color:var(--text-dim);letter-spacing:.12em;margin-top:
       <div class="mode-btn" id="mode-pva" onclick="setMode('pva')">vs AI</div>
       <div class="mode-btn" id="mode-ava" onclick="setMode('ava')">AI vs AI</div>
       <div class="mode-btn" id="mode-mp" onclick="setMode('mp')">Online</div>
+      <div class="mode-btn" id="mode-discuss" onclick="copyDiscussionLink()" title="Salin link posisi (FEN) untuk diskusi">💬 Diskusi</div>
     </div>
 
     <div class="ai-selector" id="ai-config" style="display:none;">
-      <div style="font-size:.62rem;color:var(--text-dim);margin-bottom:3px;">Level AI:</div>
-      <div class="ai-level-row" id="ai-level-row">
-        <div class="lvl-btn" onclick="setAILevel(1)">I</div>
-        <div class="lvl-btn" onclick="setAILevel(2)">II</div>
-        <div class="lvl-btn active" onclick="setAILevel(3)">III</div>
-        <div class="lvl-btn" onclick="setAILevel(4)">IV</div>
-        <div class="lvl-btn" onclick="setAILevel(5)">V</div>
-      </div>
-      <div class="ai-name" id="ai-name">⚔ KASPAROV</div>
-      <div class="ai-desc" id="ai-desc">Pemain menengah, cukup menantang</div>
+      <div class="ai-name" id="ai-name">⚔ ROYAL AI</div>
+      <div class="ai-desc" id="ai-desc">Engine dalam, bukaan + latihan puzzle di web worker</div>
       <div style="font-size:.62rem;color:var(--text-dim);margin-top:6px;margin-bottom:3px;">Kamu main sebagai:</div>
       <div class="ai-side-row">
         <div class="side-btn active" id="side-white" onclick="setPlayerSide('w')">♔ Putih</div>
@@ -359,6 +391,24 @@ header p{font-size:.78rem;color:var(--text-dim);letter-spacing:.12em;margin-top:
     <button class="btn" id="pause-btn" onclick="toggleTimer()">⏸ Jeda / Lanjut</button>
     <button class="btn" onclick="offerDraw()" id="draw-btn">🤝 Tawarkan Remis</button>
     <button class="btn danger" onclick="resign()" id="resign-btn">🏳 Menyerah</button>
+    <button class="btn" id="analysis-btn" onclick="toggleAnalysis()" style="display:none;background:linear-gradient(135deg,rgba(0,191,165,.22),rgba(0,191,165,.08));border-color:#00bfa5;color:#00bfa5;">✖ Tutup Analisis</button>
+    <div class="analysis-legend" id="analysis-legend">
+      <div class="analysis-legend-row"><div class="al-badge" style="background:#00bfa5;color:#fff;">!!</div><span style="color:var(--text-light)">Brilliant</span></div>
+      <div class="analysis-legend-row"><div class="al-badge" style="background:#f0c040;color:#222;">★</div><span style="color:var(--text-light)">Best Move</span></div>
+      <div class="analysis-legend-row"><div class="al-badge" style="background:#4a90d9;color:#fff;">👍</div><span style="color:var(--text-light)">Good Move</span></div>
+      <div class="analysis-legend-row"><div class="al-badge" style="background:#e05050;color:#fff;">?</div><span style="color:var(--text-light)">Blunder</span></div>
+      <div class="analysis-legend-row"><div class="al-badge" style="background:#cc0000;color:#fff;">??</div><span style="color:var(--text-light)">Mistake</span></div>
+    </div>
+    <div id="replay-panel" style="display:none;margin-top:4px;">
+      <div id="replay-move-info" style="min-height:48px;margin-bottom:6px;"></div>
+      <div style="display:flex;align-items:center;gap:6px;justify-content:center;">
+        <button class="btn" id="replay-start" onclick="replayGo(-9999)" style="flex:0;padding:5px 8px;font-size:.8rem;" title="Awal">⏮</button>
+        <button class="btn" id="replay-prev"  onclick="replayGo(-1)"    style="flex:0;padding:5px 8px;font-size:.8rem;" title="Mundur">◀</button>
+        <span id="replay-counter" style="font-family:'Cinzel',serif;font-size:.65rem;color:var(--gold);min-width:48px;text-align:center;">0 / 0</span>
+        <button class="btn" id="replay-next"  onclick="replayGo(1)"     style="flex:0;padding:5px 8px;font-size:.8rem;" title="Maju">▶</button>
+        <button class="btn" id="replay-end"   onclick="replayGo(9999)"  style="flex:0;padding:5px 8px;font-size:.8rem;" title="Akhir">⏭</button>
+      </div>
+    </div>
   </div>
 
   <div class="panel-card">
@@ -388,7 +438,11 @@ header p{font-size:.78rem;color:var(--text-dim);letter-spacing:.12em;margin-top:
     <div class="gameover-icon" id="gameover-icon">♔</div>
     <h2 id="gameover-title">PERMAINAN SELESAI</h2>
     <p id="gameover-desc">-</p>
-    <button class="btn primary" onclick="newGame();closeGameover();" style="width:100%;">Mulai Permainan Baru</button>
+    <div style="display:flex;flex-direction:column;gap:8px;">
+      <button class="btn primary" onclick="newGame();closeGameover();" style="width:100%;">♟ Permainan Baru</button>
+      <button class="btn" id="analysis-modal-btn" onclick="startAnalysisFromModal()" style="width:100%;display:none;background:linear-gradient(135deg,rgba(0,191,165,.22),rgba(0,191,165,.08));border-color:#00bfa5;color:#00bfa5;">🔍 Analisis Langkah</button>
+    </div>
+    <div class="analysis-loading" id="analysis-loading" style="margin-top:8px;">⚙ Menganalisis langkah…</div>
   </div>
 </div>
 
@@ -403,6 +457,7 @@ header p{font-size:.78rem;color:var(--text-dim);letter-spacing:.12em;margin-top:
   </div>
 </div>
 
+<script src="chess-engine.js"></script>
 <script>
 'use strict';
 
@@ -617,9 +672,17 @@ let capturedByWhite=[], capturedByBlack=[];
 let flipped=false, gameOver=false;
 let timerPaused=false, timers={w:600,b:600}, timerInterval=null;
 let lastMove=null, castleRights={}, enPassantTarget=null, halfMoveClock=0;
+let analysisMode=false;
+let analysisAnnotations={};
+let analysisInsights={};
+let replayIdx=-1;
+let replayHistory=[];
 
 let gameMode='pvp';
-let aiLevel=3;
+const AI_MAIN_DEPTH=6;
+let aiWorker=null;
+let aiReqSeq=0;
+const aiCallbacks=new Map();
 let playerSide='w';
 let aiColor='b';
 let aiThinking=false;
@@ -682,14 +745,6 @@ let myProfile = { username:'', elo:ELO_FLOOR };
 let oppProfile = null;
 let lastEloDelta = null;
 let eloAlreadyAppliedForGame = false;
-
-const AI_CHARS = [
-  { name:'☆ NEWCOMER',   desc:'Pemula, sering membuat kesalahan lucu',      depth:1 },
-  { name:'★ APPRENTICE', desc:'Belajar strategi dasar, bisa dikalahkan',     depth:2 },
-  { name:'⚔ KASPAROV',   desc:'Pemain menengah, cukup menantang',            depth:3 },
-  { name:'♞ GRANDMASTER',desc:'Sangat kuat, memikirkan jauh ke depan',       depth:4 },
-  { name:'♟ DEEP MIND',  desc:'Tingkat tertinggi — hampir tak terkalahkan',   depth:5 },
-];
 
 const colOf  = i => i%8;
 const rowOf  = i => Math.floor(i/8);
@@ -926,92 +981,59 @@ function minimax(b, depth, alpha, beta, maximizing, cr, ep) {
   }
 }
 
-function getBestMove(color, depth) {
-  const moves=orderMoves(allLegalMoves(color,board,castleRights,enPassantTarget),[...board]);
-  if(moves.length===0)return null;
-  const maximizing=color==='w';
-  let best=maximizing?-Infinity:Infinity,bestMove=null;
-  const noise=Math.max(0,(3-depth)*80);
-  for(const m of moves){
-    const{nb,newCR,newEP}=applyMoveForAI([...board],m,castleRights,enPassantTarget);
-    let v=minimax(nb,depth-1,-Infinity,Infinity,!maximizing,newCR,newEP);
-    v+=noise?(Math.random()-0.5)*noise:0;
-    if(maximizing?v>best:v<best){best=v;bestMove=m;}
-  }
-  return bestMove;
-}
-
 function fenFor(bArr,nextTurn,cr,ep){
   let s='';for(let i=0;i<64;i++)s+=(bArr[i]||'.');
   s+='|'+nextTurn+'|'+(cr.wK?'K':'')+(cr.wQR?'Q':'')+(cr.bK?'k':'')+(cr.bQR?'q':'');
   s+='|'+(ep!==null?ep:'-');return s;
 }
 
-function getBestMoveAva(color, depth){
-  const maximizing=color==='w';
-  const moves=allLegalMoves(color,board,castleRights,enPassantTarget);
-  if(!moves.length) return null;
+function buildCurrentFEN(){
+  return RoyalChess.boardToFEN(board,turn,castleRights,enPassantTarget,halfMoveClock,Math.floor(history.length/2)+1);
+}
 
-  if(history.length < 8){
-    const scored = moves.map(m=>{
-      const from=m.from,to=m.to;
-      const p=board[from];
-      const t=pt(p);
-      const r=rowOf(to),c=colOf(to);
-      let w=1;
-      if(t==='P' && (c===3||c===4)) w+=2.5;
-      if(t==='N') w+=1.3;
-      if(board[to] && pc(board[to])!==color) w+=2.2;
-      if(r>=2 && r<=5 && c>=2 && c<=5) w+=0.7;
-      w += avaRand()*0.35;
-      return {m,w};
-    }).sort((a,b2)=>b2.w-a.w);
-    const top=scored.slice(0, Math.min(5,scored.length));
-    const sum=top.reduce((s,x)=>s+x.w,0)||1;
-    let pick=avaRand()*sum;
-    for(const x of top){pick-=x.w;if(pick<=0) return x.m;}
-    return top[0].m;
+function ensureAiWorker(){
+  if(aiWorker) return;
+  try{
+    aiWorker=new Worker('ai-worker.js');
+    aiWorker.onmessage=function(e){
+      const d=e.data;
+      if(d.type==='bestMove'){
+        const cb=aiCallbacks.get(d.id);
+        if(cb){ aiCallbacks.delete(d.id); cb(d.move); }
+      }
+    };
+    aiWorker.postMessage({ type:'startTraining' });
+  }catch(err){
+    aiWorker=null;
   }
+}
 
-  const scored=[];
-  for(const m of moves){
-    const {nb,newCR,newEP} = applyMoveForAI([...board], m, castleRights, enPassantTarget);
-    let v = minimax(nb, Math.max(1,depth-1), -Infinity, Infinity, !maximizing, newCR, newEP);
-    if(maximizing) v += 12; else v -= 12;
-    if(board[m.to]) v += maximizing ? (PIECE_VALUES[pt(board[m.to])]||0) : -(PIECE_VALUES[pt(board[m.to])]||0);
-    if(inCheck(nb, opp(color))) v += maximizing ? 55 : -55;
-    const rep = countRep(fenFor(nb, opp(color), newCR, newEP));
-    if(rep>=2) v += maximizing ? -120 : 120;
-    if(halfMoveClock>70) v += maximizing ? -40 : 40;
-    v += (avaRand()-0.5) * 45;
-    scored.push({m,v});
+function requestAiMove(cb){
+  ensureAiWorker();
+  const fen=buildCurrentFEN();
+  if(!aiWorker){
+    const st=RoyalChess.parseFEN(fen);
+    let mv=RoyalChess.openingLookup(st.board,st.turn,st.castleRights,st.enPassantTarget,st.halfMoveClock,st.fullMoveNumber);
+    if(!mv) mv=RoyalChess.getBestMove(st.turn,AI_MAIN_DEPTH,st.board,st.castleRights,st.enPassantTarget);
+    cb(mv);
+    return;
   }
-  scored.sort((a,b2)=> maximizing ? (b2.v-a.v) : (a.v-b2.v));
-  const topK = scored.slice(0, Math.min(4, scored.length));
-  const bestV = topK[0].v;
-  const weights = topK.map(x=> Math.max(0.001, 1.0 / (1.0 + Math.exp((bestV - x.v)/60))));
-  const sum = weights.reduce((s,x)=>s+x,0)||1;
-  let pick = avaRand()*sum;
-  for(let i=0;i<topK.length;i++){pick-=weights[i]; if(pick<=0) return topK[i].m;}
-  return topK[0].m;
+  const id=++aiReqSeq;
+  aiCallbacks.set(id,cb);
+  aiWorker.postMessage({ type:'bestMove', fen, depth:AI_MAIN_DEPTH, useBook:true, id });
 }
 
 function triggerAIMove() {
   if(gameOver||aiThinking)return;
   aiThinking=true;
   document.getElementById('ai-think').style.display='block';
-  const depth=AI_CHARS[aiLevel-1].depth;
-  setTimeout(()=>{
-    const move=getBestMove(aiColor,depth);
+  requestAiMove((move)=>{
     aiThinking=false;
     document.getElementById('ai-think').style.display='none';
     if(!move||gameOver)return;
-    if(move.special==='promo'){
-      doMove({...move,promoTo:aiColor+'Q'},aiColor+'Q');
-    } else {
-      doMove(move);
-    }
-  }, depth>=4 ? 80 : 30);
+    if(move.special==='promo') doMove({...move,promoTo:aiColor+'Q'},aiColor+'Q');
+    else doMove(move);
+  });
 }
 
 function startAiVsAi() {
@@ -1026,12 +1048,11 @@ function stopAiVsAi(){clearInterval(aiVsAiInterval);aiVsAiInterval=null;}
 
 function avaOnePly(){
   if(gameOver) return;
-  const depth=AI_CHARS[aiLevel-1].depth;
-  const d = Math.max(1, depth-1);
-  const move = (avaVariety ? getBestMoveAva(turn,d) : getBestMove(turn,d));
-  if(!move){stopAiVsAi();return;}
-  if(move.special==='promo')doMove({...move,promoTo:turn+'Q'},turn+'Q');
-  else doMove(move);
+  requestAiMove((move)=>{
+    if(!move||gameOver){ stopAiVsAi(); return; }
+    if(move.special==='promo')doMove({...move,promoTo:turn+'Q'},turn+'Q');
+    else doMove(move);
+  });
 }
 
 function setAvaSpeed(ms){
@@ -1374,6 +1395,24 @@ function renderBoard(){
         pd.title=(pc(board[si])==='w'?'Putih':'Emas')+' '+PIECE_NAMES[pt(board[si])];
         div.appendChild(pd);
       }
+
+      if(analysisMode && lastMove){
+        for(let i = history.length - 1; i >= 0; i--){
+          if(history[i].to === si && analysisAnnotations[i]){
+            const cfg = BADGE_CONFIG[analysisAnnotations[i]];
+            if(cfg){
+              const badge = document.createElement('div');
+              badge.className = 'analysis-badge ' + cfg.cls;
+              badge.textContent = cfg.symbol;
+              badge.style.background = cfg.bg;
+              badge.style.color = cfg.color;
+              div.style.position = 'relative';
+              div.appendChild(badge);
+            }
+            break;
+          }
+        }
+      }
       div.addEventListener('click',()=>handleClick(parseInt(div.dataset.idx)));
       boardEl.appendChild(div);
     }
@@ -1516,6 +1555,12 @@ function showGameover(type,winner){
   document.getElementById('gameover-desc').textContent=descs[type]||'';
   document.getElementById('gameover-modal').classList.add('show');
 
+  const analysisModalBtn = document.getElementById('analysis-modal-btn');
+  if(analysisModalBtn){
+    const canAnalyse = (type==='checkmate'||type==='stalemate') && (gameMode==='pvp'||gameMode==='pva'||gameMode==='mp') && history.length > 0;
+    analysisModalBtn.style.display = canAnalyse ? 'block' : 'none';
+  }
+
   if(gameMode==='mp'){
     if(type==='draw' || type==='stalemate' || type==='draw50' || type==='insufficient' || type==='repetition'){
       applyEloResult(0.5);
@@ -1531,7 +1576,15 @@ function showGameover(type,winner){
       if(gameMode==='ava') startAiVsAi();
     }, 1200);
   }
+
+  if((type==='checkmate'||type==='stalemate') && (gameMode==='pvp'||gameMode==='pva'||gameMode==='mp')){
+    setTimeout(()=>{
+      const btn=document.getElementById('analysis-btn');
+      if(btn) btn.style.display='block';
+    }, 700);
+  }
 }
+
 function closeGameover(){document.getElementById('gameover-modal').classList.remove('show');}
 
 function offerDraw(){
@@ -1587,14 +1640,6 @@ function setMode(mode){
   newGame();
 }
 
-function setAILevel(lvl){
-  aiLevel=lvl;
-  document.querySelectorAll('.lvl-btn').forEach((el,i)=>el.classList.toggle('active',i===lvl-1));
-  const ch=AI_CHARS[lvl-1];
-  document.getElementById('ai-name').textContent=ch.name;
-  document.getElementById('ai-desc').textContent=ch.desc;
-}
-
 function setPlayerSide(side){
   playerSide=side;
   ['white','black','rand'].forEach(s=>document.getElementById('side-'+s).classList.remove('active'));
@@ -1606,6 +1651,17 @@ function newGame(){
   stopAiVsAi();clearInterval(timerInterval);
   eloAlreadyAppliedForGame = false;
   lastEloDelta = null;
+  analysisMode = false;
+  analysisAnnotations = {};
+  analysisInsights = {};
+  const ab = document.getElementById('analysis-btn');
+  if(ab){ ab.style.display='none'; }
+  const amb = document.getElementById('analysis-modal-btn');
+  if(amb) amb.style.display='none';
+  const al = document.getElementById('analysis-legend');
+  if(al) al.classList.remove('show');
+  const ald = document.getElementById('analysis-loading');
+  if(ald) ald.classList.remove('show');
   renderMyProfile();
   if(gameMode==='ava'){
     if(!avaSeeds.length) initAvaSeeds(100);
@@ -1629,6 +1685,36 @@ function newGame(){
 
 function flipBoard(){flipped=!flipped;render();}
 
+function copyDiscussionLink(){
+  const fen=RoyalChess.boardToFEN(board,turn,castleRights,enPassantTarget,halfMoveClock,Math.floor(history.length/2)+1);
+  const url=location.href.split('#')[0]+'#fen='+encodeURIComponent(fen);
+  const flash=()=>{
+    const ex=document.getElementById('extra-status');
+    if(ex){ ex.textContent='Link posisi (FEN) disalin.'; ex.style.color='var(--gold)'; }
+  };
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(url).then(flash).catch(()=>{ window.prompt('Salin link:',url); });
+  } else window.prompt('Salin link:',url);
+}
+
+function tryLoadFenFromHash(){
+  const h=location.hash;
+  if(!h.includes('fen=')) return;
+  const part=h.slice(h.indexOf('fen=')+4);
+  let raw=part;
+  try{ raw=decodeURIComponent(part); }catch(e){}
+  let st;
+  try{ st=RoyalChess.parseFEN(raw); }catch(e){ return; }
+  stopAiVsAi(); clearInterval(timerInterval);
+  board=st.board; turn=st.turn; castleRights=st.castleRights; enPassantTarget=st.enPassantTarget;
+  halfMoveClock=st.halfMoveClock|0;
+  selected=null; legalMoves=[]; history=[]; capturedByWhite=[]; capturedByBlack=[];
+  lastMove=null; gameOver=false; timerPaused=false; timers={w:600,b:600};
+  positionHistory=[getBoardFEN()];
+  render();
+  if(gameMode!=='ava') startTimer();
+}
+
 function toggleTimer(){
   if(gameOver||gameMode==='ava')return;
   timerPaused=!timerPaused;
@@ -1649,6 +1735,404 @@ function startTimer(){
   },1000);
 }
 
+/* ============================================================
+   ANALYSIS SYSTEM — Replay Navigator + Deep Engine
+   ============================================================ */
+const PIECE_CP = { P:100, N:300, B:300, R:500, Q:900, K:20000 };
+const PIECE_PT = { P:1, N:3, B:3, R:5, Q:9, K:0 };
+
+const BADGE_CONFIG = {
+  brilliant: { symbol:'!!', bg:'#00bfa5', color:'#fff', label:'Brilliant — pengorbanan tepat (2-5 langkah)' },
+  best:      { symbol:'★',  bg:'#f0c040', color:'#222', label:'Best Move — langkah terbaik' },
+  good:      { symbol:'👍', bg:'#4a90d9', color:'#fff', label:'Good Move — langkah bagus' },
+  blunder:   { symbol:'?',  bg:'#e05050', color:'#fff', label:'Blunder — kehilangan material signifikan' },
+  mistake:   { symbol:'??', bg:'#cc0000', color:'#fff', label:'Mistake — kesalahan fatal' },
+};
+
+function anaSearch(b, depth, alpha, beta, maximizing, cr, ep){
+  if(depth===0) return evaluateBoard(b);
+  const color = maximizing?'w':'b';
+  const moves = orderMoves(allLegalMoves(color,b,cr,ep),b);
+  if(!moves.length) return inCheck(b,color)?(maximizing?-90000+depth:90000-depth):0;
+  if(maximizing){
+    let best=-Infinity;
+    for(const m of moves){
+      const {nb,newCR,newEP}=applyMoveForAI([...b],m,cr,ep);
+      best=Math.max(best,anaSearch(nb,depth-1,alpha,beta,false,newCR,newEP));
+      alpha=Math.max(alpha,best); if(beta<=alpha) break;
+    }
+    return best;
+  } else {
+    let best=Infinity;
+    for(const m of moves){
+      const {nb,newCR,newEP}=applyMoveForAI([...b],m,cr,ep);
+      best=Math.min(best,anaSearch(nb,depth-1,alpha,beta,true,newCR,newEP));
+      beta=Math.min(beta,best); if(beta<=alpha) break;
+    }
+    return best;
+  }
+}
+
+function anaBestScore(color, b, cr, ep, depth){
+  const moves = orderMoves(allLegalMoves(color,b,cr,ep),b);
+  if(!moves.length) return color==='w'?-90000:90000;
+  const mx = color==='w';
+  let bestScore=mx?-Infinity:Infinity, bestMove=null;
+  for(const m of moves){
+    const {nb,newCR,newEP}=applyMoveForAI([...b],m,cr,ep);
+    const v=anaSearch(nb,depth-1,-Infinity,Infinity,!mx,newCR,newEP);
+    if(mx?v>bestScore:v<bestScore){bestScore=v;bestMove=m;}
+  }
+  return {bestScore, bestMove};
+}
+
+function canForceMateWithin(b, attackerColor, cr, ep, maxPly){
+  function dfs(brd, sideToMove, curCR, curEP, plyLeft){
+    const legalAll = allLegalMoves(sideToMove, brd, curCR, curEP);
+    const legal = orderMoves(legalAll, brd).slice(0, 18);
+    if(!legal.length){
+      return inCheck(brd, sideToMove) && sideToMove !== attackerColor;
+    }
+    if(plyLeft===0) return false;
+    if(sideToMove===attackerColor){
+      for(const mv of legal){
+        const {nb,newCR,newEP}=applyMoveForAI([...brd],mv,curCR,curEP);
+        if(dfs(nb, opp(sideToMove), newCR, newEP, plyLeft-1)) return true;
+      }
+      return false;
+    }
+    for(const mv of legal){
+      const {nb,newCR,newEP}=applyMoveForAI([...brd],mv,curCR,curEP);
+      if(!dfs(nb, opp(sideToMove), newCR, newEP, plyLeft-1)) return false;
+    }
+    return true;
+  }
+  return dfs(b, attackerColor, cr, ep, maxPly);
+}
+
+function canMateInOne(b, color, cr, ep){
+  const mvs = allLegalMoves(color, b, cr, ep);
+  for(const mv of mvs){
+    const {nb,newCR,newEP}=applyMoveForAI([...b],mv,cr,ep);
+    const replies = allLegalMoves(opp(color), nb, newCR, newEP);
+    if(!replies.length && inCheck(nb, opp(color))) return true;
+  }
+  return false;
+}
+
+function isForcingMove(b, color, mv, cr, ep){
+  const isCapture = !!b[mv.to] || mv.special==='ep';
+  if(isCapture || mv.special==='promo') return true;
+  const {nb,newCR,newEP}=applyMoveForAI([...b],mv,cr,ep);
+  return inCheck(nb, opp(color));
+}
+
+function getForcingMoves(color, b, cr, ep){
+  const legal = allLegalMoves(color, b, cr, ep);
+  const forcing = legal.filter(mv=>isForcingMove(b, color, mv, cr, ep));
+  if(forcing.length) return orderMoves(forcing, b).slice(0, 10);
+  return orderMoves(legal, b).slice(0, 6);
+}
+
+function forcingLineScore(b, sideToMove, cr, ep, plyLeft){
+  if(plyLeft===0) return evaluateBoard(b);
+  const mvs = getForcingMoves(sideToMove, b, cr, ep);
+  if(!mvs.length) return evaluateBoard(b);
+  const maximizing = sideToMove==='w';
+  let best = maximizing ? -Infinity : Infinity;
+  for(const mv of mvs){
+    const {nb,newCR,newEP}=applyMoveForAI([...b],mv,cr,ep);
+    const sc = forcingLineScore(nb, opp(sideToMove), newCR, newEP, plyLeft-1);
+    if(maximizing){ if(sc>best) best=sc; }
+    else { if(sc<best) best=sc; }
+  }
+  return best;
+}
+
+function anaTopCandidates(color, b, cr, ep, depth, limit){
+  const legal = orderMoves(allLegalMoves(color, b, cr, ep), b);
+  const out = [];
+  for(const mv of legal){
+    const {nb,newCR,newEP}=applyMoveForAI([...b],mv,cr,ep);
+    const mainRaw = anaSearch(nb,depth-1,-Infinity,Infinity,opp(color)==='w',newCR,newEP);
+    const forcingRaw = forcingLineScore(nb, opp(color), newCR, newEP, 4);
+    const raw = (mainRaw*0.75) + (forcingRaw*0.25);
+    const scorePt = (color==='w'?raw:-raw)/100;
+    out.push({ move:mv, scorePt });
+  }
+  out.sort((a,b2)=>b2.scorePt-a.scorePt);
+  return out.slice(0, limit);
+}
+
+/* --- Replay rendering --- */
+function buildBoardAt(stepIdx){
+  let b=Array(64).fill(null);
+  const br=['R','N','B','Q','K','B','N','R'];
+  for(let f=0;f<8;f++){b[f]='b'+br[f];b[8+f]='bP';b[48+f]='wP';b[56+f]='w'+br[f];}
+  let cr={wK:true,wQR:true,wKR:true,bK:true,bQR:true,bKR:true},ep=null,lastMv=null;
+  for(let i=0;i<=stepIdx&&i<replayHistory.length;i++){
+    const snap=replayHistory[i];
+    const mv={from:snap.from,to:snap.to,special:snap.special,promoTo:snap.promoTo};
+    const res=applyMoveForAI([...b],mv,cr,ep);
+    b=res.nb;cr=res.newCR;ep=res.newEP;lastMv=mv;
+  }
+  return {b, lastMv};
+}
+
+function renderReplayBoard(stepIdx){
+  const {b,lastMv} = stepIdx>=0 ? buildBoardAt(stepIdx) : buildBoardAt(-1);
+  const boardEl=document.getElementById('board');
+  boardEl.innerHTML='';
+  for(let vr=0;vr<8;vr++){
+    for(let vc=0;vc<8;vc++){
+      const ar=flipped?7-vr:vr,ac=flipped?7-vc:vc,si=sqIdx(ar,ac);
+      const div=document.createElement('div');
+      div.className='square '+((ar+ac)%2===0?'light':'dark');
+      if(lastMv&&(si===lastMv.from||si===lastMv.to)) div.classList.add('last-move');
+      if(b[si]){
+        const pd=document.createElement('div');pd.className='piece';
+        pd.innerHTML=getPieceSVG(b[si]);div.appendChild(pd);
+      }
+      if(stepIdx>=0&&si===replayHistory[stepIdx]?.to){
+        const cls=analysisAnnotations[stepIdx];
+        if(cls&&BADGE_CONFIG[cls]){
+          const cfg=BADGE_CONFIG[cls];
+          const badge=document.createElement('div');
+          badge.className='analysis-badge';
+          badge.textContent=cfg.symbol;
+          badge.style.cssText=`background:${cfg.bg};color:${cfg.color};`;
+          div.style.position='relative';
+          div.appendChild(badge);
+        }
+      }
+      boardEl.appendChild(div);
+    }
+  }
+  renderCandidateArrows(stepIdx);
+  renderCoords();
+  updateReplayUI(stepIdx);
+}
+
+function boardCenterPxForSquare(si, boardPx){
+  const r=rowOf(si), c=colOf(si);
+  const vr=flipped?(7-r):r;
+  const vc=flipped?(7-c):c;
+  const sq=boardPx/8;
+  return { x:(vc+0.5)*sq, y:(vr+0.5)*sq };
+}
+
+function renderCandidateArrows(stepIdx){
+  const boardEl=document.getElementById('board');
+  const prev=document.getElementById('analysis-arrows');
+  if(prev) prev.remove();
+  if(stepIdx<0) return;
+  const insight=analysisInsights[stepIdx];
+  if(!insight||!insight.candidates||!insight.candidates.length) return;
+
+  const px=boardEl.clientWidth;
+  const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+  svg.setAttribute('id','analysis-arrows');
+  svg.setAttribute('viewBox',`0 0 ${px} ${px}`);
+  svg.setAttribute('width','100%');
+  svg.setAttribute('height','100%');
+  svg.style.cssText='position:absolute;inset:0;pointer-events:none;z-index:5;';
+
+  const defs=document.createElementNS('http://www.w3.org/2000/svg','defs');
+  const colors=['#f0c040','#4a90d9','#00bfa5'];
+  colors.forEach((clr,i)=>{
+    const marker=document.createElementNS('http://www.w3.org/2000/svg','marker');
+    marker.setAttribute('id',`arr-${i}`);
+    marker.setAttribute('markerWidth','8');
+    marker.setAttribute('markerHeight','8');
+    marker.setAttribute('refX','7');
+    marker.setAttribute('refY','4');
+    marker.setAttribute('orient','auto');
+    const path=document.createElementNS('http://www.w3.org/2000/svg','path');
+    path.setAttribute('d','M0,0 L8,4 L0,8 Z');
+    path.setAttribute('fill',clr);
+    marker.appendChild(path);
+    defs.appendChild(marker);
+  });
+  svg.appendChild(defs);
+
+  insight.candidates.slice(0,1).forEach((c,idx)=>{
+    const from=boardCenterPxForSquare(c.move.from, px);
+    const to=boardCenterPxForSquare(c.move.to, px);
+    const ln=document.createElementNS('http://www.w3.org/2000/svg','line');
+    ln.setAttribute('x1',String(from.x));
+    ln.setAttribute('y1',String(from.y));
+    ln.setAttribute('x2',String(to.x));
+    ln.setAttribute('y2',String(to.y));
+    ln.setAttribute('stroke',colors[idx]||'#f0c040');
+    ln.setAttribute('stroke-width',String(Math.max(2, px/90)));
+    ln.setAttribute('stroke-linecap','round');
+    ln.setAttribute('opacity',idx===0?'0.92':'0.72');
+    ln.setAttribute('marker-end',`url(#arr-${idx})`);
+    svg.appendChild(ln);
+  });
+
+  boardEl.appendChild(svg);
+}
+
+function updateReplayUI(stepIdx){
+  const total=replayHistory.length;
+  document.getElementById('replay-counter').textContent=
+    stepIdx<0?`0 / ${total}`:`${stepIdx+1} / ${total}`;
+  document.getElementById('replay-prev').disabled=(stepIdx<=-1);
+  document.getElementById('replay-next').disabled=(stepIdx>=total-1);
+  const infoEl=document.getElementById('replay-move-info');
+  if(stepIdx<0){
+    infoEl.innerHTML=`<span style="color:var(--text-dim);font-size:.63rem;">Posisi awal — tekan ▶ untuk maju</span>`;
+    return;
+  }
+  const snap=replayHistory[stepIdx];
+  const cls=analysisAnnotations[stepIdx];
+  const insight=analysisInsights[stepIdx];
+  if(!cls){infoEl.innerHTML='';return;}
+  const cfg=BADGE_CONFIG[cls];
+  const colName=pc(snap.piece)==='w'?'Putih':'Emas';
+  const pName=PIECE_NAMES[pt(snap.piece)];
+  const captured=snap.captured?` makan ${PIECE_NAMES[pt(snap.captured)]}`:snap.special==='ep'?' (en passant)':'';
+  const toSq=sqName(snap.to);
+  const moveNum=Math.floor(stepIdx/2)+1;
+  infoEl.innerHTML=`
+    <div style="display:flex;align-items:center;gap:7px;margin-bottom:4px;">
+      <div style="background:${cfg.bg};color:${cfg.color};border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:900;flex-shrink:0;">${cfg.symbol}</div>
+      <div>
+        <div style="color:var(--text-light);font-size:.72rem;font-weight:600;">${moveNum}. ${colName} ${pName}${captured} → ${toSq}</div>
+        <div style="color:var(--text-dim);font-size:.6rem;">
+          ${cfg.label}${insight?` · Δ${insight.lossVsBestPt>=0?'+':''}${insight.lossVsBestPt.toFixed(1)} vs best · Proyeksi ${insight.projectedGainPt>=0?'+':''}${insight.projectedGainPt.toFixed(1)} poin`:''}
+        </div>
+        ${insight&&insight.candidates&&insight.candidates.length?`<div style="color:var(--text-dim);font-size:.58rem;margin-top:2px;">Best: ${sqName(insight.candidates[0].move.from)}→${sqName(insight.candidates[0].move.to)} (${insight.candidates[0].scorePt>=0?'+':''}${insight.candidates[0].scorePt.toFixed(1)})</div>`:''}
+      </div>
+    </div>`;
+}
+
+function replayGo(delta){
+  const next=Math.max(-1,Math.min(replayHistory.length-1,replayIdx+delta));
+  if(next===replayIdx) return;
+  replayIdx=next;
+  renderReplayBoard(replayIdx);
+}
+
+function classifyMove(moveIdx){
+  if(moveIdx<0||moveIdx>=replayHistory.length) return null;
+  const snap=replayHistory[moveIdx];
+  const color=pc(snap.piece);
+  const oppColor=opp(color);
+  const b=snap.boardSnap;
+  const cr=snap.castleRights;
+  const ep=snap.enPassantTarget;
+  const move={from:snap.from,to:snap.to,special:snap.special,promoTo:snap.promoTo};
+
+  const DEPTH=5;
+  const scorePOV=s=>color==='w'?s:-s;
+
+  const evalBefore=scorePOV(evaluateBoard(b));
+  const {bestScore:engineBestRaw,bestMove:engineBest}=anaBestScore(color,b,cr,ep,DEPTH);
+  const engineBestForUs=scorePOV(engineBestRaw);
+  const candidates=anaTopCandidates(color,b,cr,ep,DEPTH,1);
+
+  const {nb,newCR,newEP}=applyMoveForAI([...b],move,cr,ep);
+  const evalAfterRaw=anaSearch(nb,DEPTH-1,-Infinity,Infinity,oppColor==='w',newCR,newEP);
+  const evalAfter=scorePOV(evalAfterRaw);
+  const forcingAfterRaw=forcingLineScore(nb,oppColor,newCR,newEP,5);
+  const forcingAfter=scorePOV(forcingAfterRaw);
+
+  const lossVsBest=engineBestForUs-evalAfter;
+  const isEngineBest=engineBest&&engineBest.from===snap.from&&engineBest.to===snap.to;
+
+  const movedType=pt(snap.piece);
+  const movedPt=PIECE_PT[movedType]||0;
+  const capturedType=snap.captured?pt(snap.captured):null;
+  const capturedPt=capturedType?(PIECE_PT[capturedType]||0):0;
+  const oppCapturesOnTo=allLegalMoves(oppColor,nb,newCR,newEP).filter(m=>m.to===snap.to);
+  const canBeRecaptured=oppCapturesOnTo.length>0;
+  const isSacrifice=movedPt>0&&canBeRecaptured&&movedPt>capturedPt;
+
+  let bestFutureForUs=evalAfter;
+  for(let ply=2;ply<=5;ply++){
+    const futureRaw=anaSearch(nb,ply,-Infinity,Infinity,oppColor==='w',newCR,newEP);
+    const futureForUs=scorePOV(futureRaw);
+    if(futureForUs>bestFutureForUs) bestFutureForUs=futureForUs;
+  }
+  const projectedGainCp=bestFutureForUs-evalBefore;
+  const projectedGainPt=projectedGainCp/100;
+  const lossVsBestPt=lossVsBest/100;
+  const forcingRiskCp=evalAfter-forcingAfter;
+  analysisInsights[moveIdx]={projectedGainPt,lossVsBestPt,candidates};
+
+  const weMateInOne=canMateInOne(nb,color,newCR,newEP);
+  const weForceMateSoon=canForceMateWithin(nb,color,newCR,newEP,5);
+  const oppMateInOne=canMateInOne(nb,oppColor,newCR,newEP);
+  const oppForceMateSoon=canForceMateWithin(nb,oppColor,newCR,newEP,3);
+
+  if(isSacrifice){
+    const tacticalWin=weMateInOne||weForceMateSoon||projectedGainCp>=300;
+    const safeEnough=!oppMateInOne&&!oppForceMateSoon;
+    if(tacticalWin&&safeEnough&&lossVsBest<=220&&forcingRiskCp<220) return 'brilliant';
+    if(oppMateInOne||lossVsBest>450||projectedGainCp<-250||forcingRiskCp>320) return 'mistake';
+    if(lossVsBest>220||projectedGainCp<-120) return 'blunder';
+    return 'good';
+  }
+
+  if((oppMateInOne||oppForceMateSoon)&&!weMateInOne) return 'mistake';
+  if(forcingRiskCp>280) return 'blunder';
+
+  if(isEngineBest||lossVsBest<=30) return 'best';
+  if(lossVsBest<=120) return 'good';
+  if(lossVsBest<=350) return 'blunder';
+  return 'mistake';
+}
+
+function delay(ms){return new Promise(r=>setTimeout(r,ms));}
+
+async function startAnalysisFromModal(){
+  const modalBtn=document.getElementById('analysis-modal-btn');
+  const loading=document.getElementById('analysis-loading');
+  if(modalBtn) modalBtn.style.display='none';
+  if(loading){ loading.classList.add('show'); loading.textContent='⚙ Mempersiapkan analisis…'; }
+
+  replayHistory=history.map(s=>({...s,boardSnap:[...s.boardSnap]}));
+  analysisAnnotations={};
+  analysisInsights={};
+  analysisMode=true;
+  replayIdx=replayHistory.length-1;
+
+  /* Langsung tutup modal & tampilkan board SEKARANG tanpa tunggu analisis selesai */
+  await delay(60);
+  closeGameover();
+  const closeBtn=document.getElementById('analysis-btn');
+  if(closeBtn) closeBtn.style.display='block';
+  document.getElementById('analysis-legend').classList.add('show');
+  document.getElementById('replay-panel').style.display='block';
+  renderReplayBoard(replayIdx);
+
+  /* Analisis jalan di background, update badge satu-satu begitu selesai */
+  for(let i=0;i<replayHistory.length;i++){
+    analysisAnnotations[i]=classifyMove(i);
+    /* Kalau user lagi lihat langkah ini, refresh badge-nya langsung */
+    if(i===replayIdx) renderReplayBoard(replayIdx);
+    if(loading) loading.textContent=`⚙ Menganalisis… ${i+1}/${replayHistory.length}`;
+    /* Yield ke browser setiap langkah supaya UI tetap responsif */
+    await delay(0);
+  }
+
+  if(loading) loading.classList.remove('show');
+  /* Render sekali lagi di akhir supaya semua badge final */
+  renderReplayBoard(replayIdx);
+}
+
+function toggleAnalysis(){
+  if(!analysisMode) return;
+  analysisMode=false; analysisAnnotations={}; analysisInsights={}; replayHistory=[]; replayIdx=-1;
+  const btn=document.getElementById('analysis-btn');
+  if(btn) btn.style.display='none';
+  document.getElementById('analysis-legend').classList.remove('show');
+  document.getElementById('replay-panel').style.display='none';
+  renderBoard();
+}
+
 myProfile.username = randomUsername();
 renderMyProfile();
 detectAddress().then(addr=>{
@@ -1657,9 +2141,15 @@ detectAddress().then(addr=>{
 });
 buildThemePickers();
 applyBoardTheme(0);
-setAILevel(3);
 checkMPHash();
-newGame();
+ensureAiWorker();
+const __hashMp=location.hash.includes('mp=');
+const __hashFen=location.hash.includes('fen=')&&!__hashMp;
+const __firstVisit=!localStorage.getItem('royalchess_has_visited_v1');
+if(__firstVisit) localStorage.setItem('royalchess_has_visited_v1','1');
+if(__hashFen) tryLoadFenFromHash();
+else if(!__hashMp && __firstVisit) setMode('pva');
+else if(!__hashMp) newGame();
 </script>
 </body>
 </html>
