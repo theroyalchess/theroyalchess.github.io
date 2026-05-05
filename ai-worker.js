@@ -18,6 +18,13 @@ function pickMove(state, depth, useBook) {
 
 self.onmessage = function (e) {
   const d = e.data;
+  if (d.type === 'importTT') {
+    if (d.entries && d.entries.length) RoyalChess.importTranspositionTable(d.entries);
+  }
+  if (d.type === 'exportTT') {
+    const payload = RoyalChess.exportTranspositionTable(d.maxEntries || 2500);
+    self.postMessage({ type: 'ttExport', payload: payload });
+  }
   if (d.type === 'startTraining') {
     if (trainTimer) clearInterval(trainTimer);
     trainTimer = setInterval(function () {

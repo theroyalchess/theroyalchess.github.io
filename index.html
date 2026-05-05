@@ -257,7 +257,7 @@ header p{font-size:.78rem;color:var(--text-dim);letter-spacing:.12em;margin-top:
 
     <div class="ai-selector" id="ai-config" style="display:none;">
       <div class="ai-name" id="ai-name">⚔ ROYAL AI</div>
-      <div class="ai-desc" id="ai-desc">Engine dalam, bukaan + latihan puzzle di web worker</div>
+      <div class="ai-desc" id="ai-desc">Engine + puzzle di worker; memori taktis disimpan di perangkat (buka lagi = lanjut dari situ). Tab ditutup = proses berhenti — bukan latihan server.</div>
       <div style="font-size:.62rem;color:var(--text-dim);margin-top:6px;margin-bottom:3px;">Kamu main sebagai:</div>
       <div class="ai-side-row">
         <div class="side-btn active" id="side-white" onclick="setPlayerSide('w')">♔ Putih</div>
@@ -680,9 +680,12 @@ let replayHistory=[];
 
 let gameMode='pvp';
 const AI_MAIN_DEPTH=6;
+const TT_STORAGE_KEY='royalchess_tt_v1';
+const TT_PERSIST_MAX=2500;
 let aiWorker=null;
 let aiReqSeq=0;
 const aiCallbacks=new Map();
+let ttFlushBusy=false;
 let playerSide='w';
 let aiColor='b';
 let aiThinking=false;
@@ -991,6 +994,12 @@ function buildCurrentFEN(){
   return RoyalChess.boardToFEN(board,turn,castleRights,enPassantTarget,halfMoveClock,Math.floor(history.length/2)+1);
 }
 
+function persistAiMemory(){
+  if(!aiWorker||ttFlushBusy) return;
+  ttFlushBusy=true;
+  aiWorker.postMessage({ type:'exportTT', maxEntries:TT_PERSIST_MAX });
+}
+
 function ensureAiWorker(){
   if(aiWorker) return;
   try{
@@ -1001,8 +1010,30 @@ function ensureAiWorker(){
         const cb=aiCallbacks.get(d.id);
         if(cb){ aiCallbacks.delete(d.id); cb(d.move); }
       }
+      if(d.type==='ttExport'){
+        ttFlushBusy=false;
+        try{
+          localStorage.setItem(TT_STORAGE_KEY, JSON.stringify(d.payload));
+        }catch(err){
+          try{
+            const half=d.payload.slice(0, Math.floor((d.payload&&d.payload.length)||0)/2);
+            localStorage.setItem(TT_STORAGE_KEY, JSON.stringify(half));
+          }catch(e2){}
+        }
+      }
     };
+    let saved=null;
+    try{
+      const raw=localStorage.getItem(TT_STORAGE_KEY);
+      if(raw) saved=JSON.parse(raw);
+    }catch(err){}
+    if(saved&&saved.length) aiWorker.postMessage({ type:'importTT', entries:saved });
     aiWorker.postMessage({ type:'startTraining' });
+    setInterval(persistAiMemory, 60000);
+    document.addEventListener('visibilitychange', ()=>{
+      if(document.visibilityState==='hidden') persistAiMemory();
+    });
+    window.addEventListener('pagehide', persistAiMemory);
   }catch(err){
     aiWorker=null;
   }

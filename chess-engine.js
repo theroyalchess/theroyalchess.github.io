@@ -317,6 +317,30 @@ var RoyalChess = (function () {
     return best;
   }
 
+  function exportTranspositionTable(maxEntries) {
+    const n = Math.max(100, Math.min(maxEntries | 0, 8000));
+    const arr = Array.from(tt.entries()).map(([k, v]) => [k, v.s, v.d]);
+    arr.sort((a, b) => b[2] - a[2] || Math.abs(b[1] - a[1]));
+    return arr.slice(0, n);
+  }
+
+  function importTranspositionTable(entries) {
+    if (!entries || !Array.isArray(entries)) return;
+    tt.clear();
+    let added = 0;
+    for (const row of entries) {
+      if (!row || row.length < 3) continue;
+      const k = row[0],
+        s = +row[1],
+        d = row[2] | 0;
+      if (typeof k !== 'string' || !Number.isFinite(s)) continue;
+      tt.set(k, { s, d });
+      added++;
+      if (added >= 10000) break;
+    }
+    ttTrim();
+  }
+
   function getBestMove(color, depth, b, cr, ep) {
     const moves = orderMoves(allLegalMoves(color, b, cr, ep), b);
     if (!moves.length) return null;
@@ -517,5 +541,7 @@ var RoyalChess = (function () {
     PIECE_VALUES,
     defaultCastleRights,
     PUZZLES,
+    exportTranspositionTable,
+    importTranspositionTable,
   };
 })();
